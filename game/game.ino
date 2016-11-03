@@ -1,3 +1,5 @@
+#pragma mark Arduino specific includes
+#ifndef TEST
    // Core library for code-sense - IDE-based
 #if defined(WIRING) // Wiring specific
 #include "Wiring.h"
@@ -29,14 +31,13 @@
 
 #include <SPI.h>
 #include <MFRC522.h>
-
 #include <Firmata.h>
 
 namespace pin {
    
    template <size_t Pin> struct out {
+      static_assert(IS_PIN_DIGITAL(Pin), "not acceptable digital pin");
       out() {
-         static_assert(IS_PIN_DIGITAL(Pin), "not acceptable digital pin");
          pinMode(Pin, OUTPUT);
       }
       void set(bool val) {
@@ -65,14 +66,17 @@ pin::out<5> lamp_4;
 pin::out<6> lamp_5;
 pin::out<7> output;
 
+#endif // TEST
+#pragma mark - finite state machine
+
 namespace finite {
+   
    template <typename T, size_t Size = sizeof(T) * 8>
    class state {
       static_assert(Size <= sizeof(T) * 8, "");
       T _bits;
    public:
-      
-      state(): _bits(0) {};
+      state(): _bits(0) {}
       state(T b): _bits(b) {}
       typedef T value_type;
       
@@ -82,83 +86,88 @@ namespace finite {
          return bitRead(_bits, X);
       }
       
-      T get(size_t X) const {
+      constexpr T get(size_t X) const {
          return bitRead(_bits, X);
       }
       
       template<size_t X>
-      void set(bool value) {
+      state& set(bool value) {
          static_assert(X < Size, "");
          bitWrite(_bits, X, value);
+         return *this;
       }
       
-      T bits() const {
+      state& set(size_t X, bool value) {
+         bitWrite(_bits, X, value);
+         return *this;
+      }
+      
+      constexpr T bits() const {
          return _bits;
       };
-      
       constexpr static size_t size(){
          return Size;
+      }
+      constexpr bool operator == (const state& s) const {
+         return _bits == s._bits;
       }
    };
    
    template<typename T>
-   const char * to_string(const T &t){
+   const char * to_string(const T &t, char start){
       static char string[T::size() + 1];
       const size_t bytes = T::size();
       memset(string, '\0', bytes + 1);
       for (size_t byte = 0; byte < bytes; ++byte) {
-         string[byte] = (t.get(byte)) ? '1' : '0';
+         string[byte] = (t.get(byte)) ? start+byte : '_';
       }
       return string;
    }
    
-   template<typename State, typename Value>
-   struct state_machine_transition {
-      State from, to;
-      Value end_value;
-      state_machine_transition(const State f, const State t, const Value& v)
-      : from(f), to(t), end_value(v) {}
-   };
-   
    template<typename State, typename Value, size_t N>
    class state_machine {
       State from_states[N], to_states[N];
-      Value values[N];
-      const char * names[N];
       State current_state;
+      
+      Value values[N];
       Value current_value;
+      
+      const char * names[N];
       const char* current_name;
    public:
       const char* state() const {
          return current_name;
       };
       
-      state_machine(State s, Value v) : current_state(s), current_value(v), current_name("initial") {}
+      constexpr state_machine(State s, Value v) : current_state(s), current_value(v), current_name("initial") {}
       
       template<size_t X>
-      void transition(const State from, const State to, const Value& value, const char* name){
+      void set_transition(const State from, const State to, const Value& value, const char* name){
          from_states[X] = from;
          to_states[X] = to;
          values[X] = value;
          names[X] = name;
       }
       
-      const Value& next_state(const State new_state) {
-         
+      const Value& next_state(const State state) {
          for (size_t i = 0; i < N; ++i) {
-            if (from_states[i] == current_state && to_states[i]->bits() == new_state->bits()){
+            if (from_states[i] == current_state && to_states[i]->bits() == state->bits()){
                current_state = to_states[i];
                current_value = values[i];
                current_name = names[i];
-               break;
+               return current_value;
             }
          }
-         
          return current_value;
       }
    };
 }
 
+#ifndef TEST
+/*
+ * @brief : read MFRC522 each time function caled.
+ * @return : string with TAG id
+ */
 bool is_module_find_card_with_id(MFRC522& module, const String& uuid) {
    byte atqa_answer[2];
    byte atqa_size = 2;
@@ -181,73 +190,89 @@ bool is_module_find_card_with_id(MFRC522& module, const String& uuid) {
    return content.equals(uuid);
 }
 
-typedef finite::state<unsigned char, 4> card_state;
-typedef finite::state<unsigned char, 6> lamp_state;
+#endif // TEST
 
-struct states {
-   card_state state;
-   lamp_state value;
+namespace states{
+   typedef finite::state<unsigned char, 4> card;
+   typedef finite::state<unsigned char, 6> lamp;
    
-   states(size_t A, size_t B, size_t C, size_t D, size_t L1, size_t L2, size_t L3, size_t L4, size_t L5, size_t out){
-      state.set< 0 >(A != 0);
-      state.set< 1 >(B != 0);
-      state.set< 2 >(C != 0);
-      state.set< 3 >(D != 0);
+   /*
+    * @brief : helper container for input & output bits vectors
+    */
+   struct in_out_pair {
+      card state;
+      lamp value;
       
-      value.set< 0 >(L1 != 0);
-      value.set< 1 >(L2 != 0);
-      value.set< 2 >(L3 != 0);
-      value.set< 3 >(L4 != 0);
-      value.set< 4 >(L5 != 0);
-      value.set< 5 >(out != 0);
-   }
-};
-
-#define CARDS(cards, ...) (cards, ##__VA_ARGS__,
-#define PINS(pins, ...) pins, ##__VA_ARGS__)
-const size_t _ = 0;
-static states
-____  CARDS(0,0,0,0)  PINS(_,_,_,_,_,_),
-A___  CARDS(1,0,0,0)  PINS(1,2,_,_,_,_),
-_B__  CARDS(0,1,0,0)  PINS(_,2,3,4,_,_),
-__C_  CARDS(0,0,1,0)  PINS(_,_,_,4,5,_),
-AB__  CARDS(1,1,0,0)  PINS(1,_,3,4,_,_),
-_BC_  CARDS(0,1,1,0)  PINS(_,2,3,_,5,_),
-A_C_  CARDS(1,0,1,0)  PINS(1,2,_,4,5,_),
-ABC_  CARDS(1,1,1,0)  PINS(1,_,3,_,5,_),
-A_C_2 CARDS(1,0,1,0)  PINS(1,2,3,4,5,_),
-ABC_2 CARDS(1,1,1,0)  PINS(1,2,3,4,5,_),
-ABCD  CARDS(1,1,1,1)  PINS(1,2,3,4,5,6);
-
-finite::state_machine<card_state*, lamp_state, 16> machine(&____.state, ____.value);
-
-void setup() {
+      in_out_pair(bool A, bool B, bool C, bool D, bool L1, bool L2, bool L3, bool L4, bool L5, bool out){
+         state
+         .set< 0 >(A)
+         .set< 1 >(B)
+         .set< 2 >(C)
+         .set< 3 >(D);
+         
+         value
+         .set< 0 >(L1)
+         .set< 1 >(L2)
+         .set< 2 >(L3)
+         .set< 3 >(L4)
+         .set< 4 >(L5)
+         .set< 5 >(out);
+      }
+   };
    
+#define CARDS(cards, ...) (cards, ##__VA_ARGS__,
+#define PINS_OUT(pins, ...) pins, ##__VA_ARGS__)
+   
+   const size_t _ = 0;
+   static in_out_pair
+   ____  CARDS(0,0,0,0)  PINS_OUT(_,_,_,_,_,_),
+   A___  CARDS(1,0,0,0)  PINS_OUT(1,2,_,_,_,_),
+   _B__  CARDS(0,1,0,0)  PINS_OUT(_,2,3,4,_,_),
+   __C_  CARDS(0,0,1,0)  PINS_OUT(_,_,_,4,5,_),
+   AB__  CARDS(1,1,0,0)  PINS_OUT(1,_,3,4,_,_),
+   _BC_  CARDS(0,1,1,0)  PINS_OUT(_,2,3,_,5,_),
+   A_C_  CARDS(1,0,1,0)  PINS_OUT(1,2,_,4,5,_),
+   ABC_  CARDS(1,1,1,0)  PINS_OUT(1,_,3,_,5,_),
+   A_C_2 CARDS(1,0,1,0)  PINS_OUT(1,2,3,4,5,_),
+   ABC_2 CARDS(1,1,1,0)  PINS_OUT(1,2,3,4,5,_),
+   ABCD  CARDS(1,1,1,1)  PINS_OUT(1,2,3,4,5,6);
+}
+
+finite::state_machine<states::card*, states::lamp, 15> machine(&states::____.state, states:: ____.value);
+
+void setup_state_machine(){
+   using namespace states;
 #define FROM(node) (&node.state,
 #define TO(node) &node.state, node.value, #node)
    
-   machine.transition<1>  FROM(____)  TO(A___);
-   machine.transition<2>  FROM(____)  TO(_B__);
-   machine.transition<3>  FROM(____)  TO(__C_);
+   machine.set_transition<0>  FROM(____)  TO(A___);
+   machine.set_transition<1>  FROM(____)  TO(_B__);
+   machine.set_transition<2>  FROM(____)  TO(__C_);
    
-   machine.transition<4>  FROM(A___)  TO(AB__);
-   machine.transition<5>  FROM(A___)  TO(A_C_);
+   machine.set_transition<3>  FROM(A___)  TO(AB__);
+   machine.set_transition<4>  FROM(A___)  TO(A_C_);
    
-   machine.transition<6>  FROM(_B__)  TO(AB__);
-   machine.transition<7>  FROM(_B__)  TO(_BC_);
+   machine.set_transition<5>  FROM(_B__)  TO(AB__);
+   machine.set_transition<6>  FROM(_B__)  TO(_BC_);
    
-   machine.transition<8>  FROM(__C_)  TO(A_C_);
-   machine.transition<9>  FROM(__C_)  TO(_BC_);
+   machine.set_transition<7>  FROM(__C_)  TO(A_C_);
+   machine.set_transition<8>  FROM(__C_)  TO(_BC_);
    
-   machine.transition<10> FROM(AB__)  TO(ABC_);
-   machine.transition<11> FROM(_BC_)  TO(ABC_);
-   machine.transition<12> FROM(A_C_) TO(ABC_);
+   machine.set_transition<9>  FROM(AB__)  TO(ABC_);
+   machine.set_transition<10> FROM(_BC_)  TO(ABC_);
+   machine.set_transition<11> FROM(A_C_)  TO(ABC_);
    
-   machine.transition<13> FROM(ABC_)  TO(A_C_2);
+   machine.set_transition<12> FROM(ABC_)  TO(A_C_2);
    
-   machine.transition<14> FROM(A_C_2) TO(ABC_2);
+   machine.set_transition<13> FROM(A_C_2) TO(ABC_2);
    
-   machine.transition<15> FROM(ABC_2) TO(ABCD);
+   machine.set_transition<14> FROM(ABC_2) TO(ABCD);
+}
+
+#ifndef TEST
+
+void setup() {
+   setup_state_machine();
    
    Serial.begin(19200);
    while (!Serial);
@@ -260,8 +285,7 @@ void setup() {
 }
 
 void loop() {
-   
-   static card_state inputs;
+   static states::card inputs(0);
    
    inputs.set< 0 >(is_module_find_card_with_id(reader_A.module, String("56bbd45c")));
    inputs.set< 1 >(is_module_find_card_with_id(reader_B.module, String("b508d965")));
@@ -276,4 +300,8 @@ void loop() {
    lamp_4.set(outputs.get< 3 >());
    lamp_5.set(outputs.get< 4 >());
    output.set(outputs.get< 5 >());
+   
+   Serial.println(String("in: ") + finite::to_string(inputs, 'A')+" out: "+finite::to_string(inputs, '1')+" "+machine.state());
 }
+
+#endif // TEST

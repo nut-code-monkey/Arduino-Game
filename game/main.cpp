@@ -8,10 +8,10 @@
 // Project 		game
 //
 // Created by 	Maksym Lunin, 31/10/16 11:19
-//              Maksym Lunin
+//             Maksym Lunin
 //
 // Copyright 	© Maksym Lunin, 2016
-// Licence 		<#licence#>
+// Licence 		MIT
 //
 // See 			game.ino and ReadMe.txt for references
 //

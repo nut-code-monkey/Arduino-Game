@@ -7,7 +7,7 @@
   Project game
   Created by Maksym Lunin on 31/10/16
   Copyright © 2016 Maksym Lunin
-  Licence <#licence#>
+  Licence MIT
 
 
 
