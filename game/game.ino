@@ -40,7 +40,7 @@ namespace pin {
          pinMode(Pin, OUTPUT);
       }
       void set(bool val) {
-         digitalWrite(Pin, val ? HIGH : LOW);
+         digitalWrite(Pin, val ? LOW : HIGH);
       }
    };
    
@@ -53,50 +53,70 @@ namespace pin {
    };
 }
 
-pin::card_reader<0, 1> reader_A;
-pin::card_reader<2, 3> reader_B;
-pin::card_reader<4, 5> reader_C;
-pin::card_reader<6, 7> reader_D;
+pin::card_reader<30, 31> reader_A;
+pin::card_reader<32, 33> reader_B;
+pin::card_reader<34, 35> reader_C;
+pin::card_reader<36, 37> reader_D;
 
-pin::out<10> lamp_1;
-pin::out<11> lamp_2;
-pin::out<12> lamp_3;
-pin::out<13> lamp_4;
-pin::out<14> lamp_5;
-pin::out<15> output;
+pin::out<2> lamp_1;
+pin::out<3> lamp_2;
+pin::out<4> lamp_3;
+pin::out<5> lamp_4;
+pin::out<6> lamp_5;
+pin::out<7> output;
 
 namespace finite {
    template <typename T, size_t Size = sizeof(T) * 8>
    class state {
       static_assert(Size <= sizeof(T) * 8, "");
-      T bits;
+      T _bits;
    public:
-      state() = default;
-      state(T b): bits(b) {}
+      
+      state(): _bits(0) {};
+      state(T b): _bits(b) {}
       typedef T value_type;
       
       template<size_t X>
       T get() const {
          static_assert(X < Size, "");
-         return bitRead(bits, X);
+         return bitRead(_bits, X);
+      }
+      
+      T get(size_t X) const {
+         return bitRead(_bits, X);
       }
       
       template<size_t X>
       void set(bool value) {
          static_assert(X < Size, "");
-         bitWrite(bits, X, value);
+         bitWrite(_bits, X, value);
       }
       
-      operator T () const {
-         return bits;
+      T bits() const {
+         return _bits;
+      };
+      
+      constexpr static size_t size(){
+         return Size;
       }
    };
+   
+   template<typename T>
+   const char * to_string(const T &t){
+      static char string[T::size() + 1];
+      const size_t bytes = T::size();
+      memset(string, '\0', bytes + 1);
+      for (size_t byte = 0; byte < bytes; ++byte) {
+         string[byte] = (t.get(byte)) ? '1' : '0';
+      }
+      return string;
+   }
    
    template<typename State, typename Value>
    struct state_machine_transition {
       State from, to;
       Value end_value;
-      state_machine_transition(const State& f, const State& t, const Value& v)
+      state_machine_transition(const State f, const State t, const Value& v)
       : from(f), to(t), end_value(v) {}
    };
    
@@ -104,25 +124,37 @@ namespace finite {
    class state_machine {
       State from_states[N], to_states[N];
       Value values[N];
-      int current_state_idx;
-      
+      const char * names[N];
+      State current_state;
+      Value current_value;
+      const char* current_name;
    public:
+      const char* state() const {
+         return current_name;
+      };
+      
+      state_machine(State s, Value v) : current_state(s), current_value(v), current_name("initial") {}
+      
       template<size_t X>
-      void transition(const State& from, const State& to, const Value& value){
+      void transition(const State from, const State to, const Value& value, const char* name){
          from_states[X] = from;
          to_states[X] = to;
          values[X] = value;
+         names[X] = name;
       }
       
-      const Value& next_state(const State& new_state) {
-         const State& current_state = from_states[current_state_idx];
-         for (size_t i = current_state_idx; i < N; ++i) {
-            if (from_states[i] == current_state && to_states[i] == new_state) {
-               current_state_idx = i;
+      const Value& next_state(const State new_state) {
+         
+         for (size_t i = 0; i < N; ++i) {
+            if (from_states[i] == current_state && to_states[i]->bits() == new_state->bits()){
+               current_state = to_states[i];
+               current_value = values[i];
+               current_name = names[i];
                break;
             }
          }
-         return values[current_state_idx];
+         
+         return current_value;
       }
    };
 }
@@ -171,29 +203,29 @@ struct states {
    }
 };
 
-finite::state_machine<card_state, lamp_state, 16> machine;
+#define CARDS(cards, ...) (cards, ##__VA_ARGS__,
+#define PINS(pins, ...) pins, ##__VA_ARGS__)
+const size_t _ = 0;
+static states
+____  CARDS(0,0,0,0)  PINS(_,_,_,_,_,_),
+A___  CARDS(1,0,0,0)  PINS(1,2,_,_,_,_),
+_B__  CARDS(0,1,0,0)  PINS(_,2,3,4,_,_),
+__C_  CARDS(0,0,1,0)  PINS(_,_,_,4,5,_),
+AB__  CARDS(1,1,0,0)  PINS(1,_,3,4,_,_),
+_BC_  CARDS(0,1,1,0)  PINS(_,2,3,_,5,_),
+A_C_  CARDS(1,0,1,0)  PINS(1,2,_,4,5,_),
+ABC_  CARDS(1,1,1,0)  PINS(1,_,3,_,5,_),
+A_C_2 CARDS(1,0,1,0)  PINS(1,2,3,4,5,_),
+ABC_2 CARDS(1,1,1,0)  PINS(1,2,3,4,5,_),
+ABCD  CARDS(1,1,1,1)  PINS(1,2,3,4,5,6);
+
+finite::state_machine<card_state*, lamp_state, 16> machine(&____.state, ____.value);
 
 void setup() {
    
-#define CARDS(cards, ...) (cards, ##__VA_ARGS__,
-#define PINS(pins, ...) pins, ##__VA_ARGS__)
-   const size_t _ = 0;
-   states
-   ____  CARDS(0,0,0,0)  PINS(_,_,_,_,_,_),
-   A___  CARDS(1,0,0,0)  PINS(1,2,_,_,_,_),
-   _B__  CARDS(0,1,0,0)  PINS(_,2,3,4,_,_),
-   __C_  CARDS(0,0,1,0)  PINS(_,_,_,4,5,_),
-   AB__  CARDS(1,1,0,0)  PINS(1,_,3,4,_,_),
-   _BC_  CARDS(0,1,1,0)  PINS(_,2,3,_,5,_),
-   A_C_  CARDS(1,0,1,0)  PINS(1,2,_,4,5,_),
-   ABC_  CARDS(1,1,1,0)  PINS(1,_,3,_,5,_),
-   A_C_2 CARDS(1,0,1,0)  PINS(1,2,3,4,5,_),
-   ABC_2 CARDS(1,1,1,0)  PINS(1,2,3,4,5,_),
-   ABCD  CARDS(1,1,1,1)  PINS(1,2,3,4,5,6);
+#define FROM(node) (&node.state,
+#define TO(node) &node.state, node.value, #node)
    
-#define FROM(node) (node.state,
-#define TO(node) node.state, node.value)
-
    machine.transition<1>  FROM(____)  TO(A___);
    machine.transition<2>  FROM(____)  TO(_B__);
    machine.transition<3>  FROM(____)  TO(__C_);
@@ -209,7 +241,7 @@ void setup() {
    
    machine.transition<10> FROM(AB__)  TO(ABC_);
    machine.transition<11> FROM(_BC_)  TO(ABC_);
-   machine.transition<12> FROM(A_C_)  TO(ABC_);
+   machine.transition<12> FROM(A_C_) TO(ABC_);
    
    machine.transition<13> FROM(ABC_)  TO(A_C_2);
    
@@ -231,12 +263,12 @@ void loop() {
    
    static card_state inputs;
    
-   inputs.set< 0 >(is_module_find_card_with_id(reader_A.module, String("062c565e")));
-   inputs.set< 1 >(is_module_find_card_with_id(reader_B.module, String("062c565e")));
-   inputs.set< 2 >(is_module_find_card_with_id(reader_C.module, String("56bbd45c")));
-   inputs.set< 3 >(is_module_find_card_with_id(reader_D.module, String("5137d265")));
+   inputs.set< 0 >(is_module_find_card_with_id(reader_A.module, String("56bbd45c")));
+   inputs.set< 1 >(is_module_find_card_with_id(reader_B.module, String("b508d965")));
+   inputs.set< 2 >(is_module_find_card_with_id(reader_C.module, String("062c565e")));
+   inputs.set< 3 >(is_module_find_card_with_id(reader_D.module, String("1537d265")));
    
-   auto outputs = machine.next_state(inputs);
+   auto outputs = machine.next_state(&inputs);
    
    lamp_1.set(outputs.get< 0 >());
    lamp_2.set(outputs.get< 1 >());
