@@ -71,6 +71,17 @@ pin::out<7> output;
 
 namespace finite {
    
+   template<typename T>
+   const char * to_string(const T &t, char start){
+      static char string[T::size() + 1];
+      const size_t bytes = T::size();
+      memset(string, '\0', bytes + 1);
+      for (size_t byte = 0; byte < bytes; ++byte) {
+         string[byte] = (t.get(byte)) ? start+byte : '_';
+      }
+      return string;
+   }
+   
    template <typename T, size_t Size = sizeof(T) * 8>
    class state {
       static_assert(Size <= sizeof(T) * 8, "");
@@ -111,18 +122,11 @@ namespace finite {
       constexpr bool operator == (const state& s) const {
          return _bits == s._bits;
       }
-   };
-   
-   template<typename T>
-   const char * to_string(const T &t, char start){
-      static char string[T::size() + 1];
-      const size_t bytes = T::size();
-      memset(string, '\0', bytes + 1);
-      for (size_t byte = 0; byte < bytes; ++byte) {
-         string[byte] = (t.get(byte)) ? start+byte : '_';
+      
+      const char* to_string(char start) const {
+         return finite::to_string(*this, start);
       }
-      return string;
-   }
+   };
    
    template<typename State, typename Value, size_t N>
    class state_machine {
@@ -135,12 +139,23 @@ namespace finite {
       const char * names[N];
       const char* current_name;
    public:
-      const char* state() const {
+      
+      void reset() {
+         current_state = from_states[0];
+         current_value = values[0];
+         current_name = names[0];
+      }
+      
+      const char* state_name() const {
          return current_name;
       };
       
-      constexpr state_machine(State s, Value v) : current_state(s), current_value(v), current_name("initial") {}
-      
+      state_machine(State s, Value v) : current_state(s), current_value(v), current_name("initial") {
+         from_states[0] = current_state;
+         to_states[0] = current_state;
+         names[0] = current_name;
+      }
+   
       template<size_t X>
       void set_transition(const State from, const State to, const Value& value, const char* name){
          from_states[X] = from;
@@ -238,35 +253,35 @@ namespace states{
    ABCD  CARDS(1,1,1,1)  PINS_OUT(1,2,3,4,5,6);
 }
 
-finite::state_machine<states::card*, states::lamp, 15> machine(&states::____.state, states:: ____.value);
+finite::state_machine<states::card*, states::lamp, 16> machine(&states::____.state, states:: ____.value);
 
 void setup_state_machine(){
    using namespace states;
 #define FROM(node) (&node.state,
 #define TO(node) &node.state, node.value, #node)
    
-   machine.set_transition<0>  FROM(____)  TO(A___);
-   machine.set_transition<1>  FROM(____)  TO(_B__);
-   machine.set_transition<2>  FROM(____)  TO(__C_);
+   machine.set_transition<1>  FROM(____)  TO(A___);
+   machine.set_transition<2>  FROM(____)  TO(_B__);
+   machine.set_transition<3>  FROM(____)  TO(__C_);
    
-   machine.set_transition<3>  FROM(A___)  TO(AB__);
-   machine.set_transition<4>  FROM(A___)  TO(A_C_);
+   machine.set_transition<4>  FROM(A___)  TO(AB__);
+   machine.set_transition<5>  FROM(A___)  TO(A_C_);
    
-   machine.set_transition<5>  FROM(_B__)  TO(AB__);
-   machine.set_transition<6>  FROM(_B__)  TO(_BC_);
+   machine.set_transition<6>  FROM(_B__)  TO(AB__);
+   machine.set_transition<7>  FROM(_B__)  TO(_BC_);
    
-   machine.set_transition<7>  FROM(__C_)  TO(A_C_);
-   machine.set_transition<8>  FROM(__C_)  TO(_BC_);
+   machine.set_transition<8>  FROM(__C_)  TO(A_C_);
+   machine.set_transition<9>  FROM(__C_)  TO(_BC_);
    
-   machine.set_transition<9>  FROM(AB__)  TO(ABC_);
-   machine.set_transition<10> FROM(_BC_)  TO(ABC_);
-   machine.set_transition<11> FROM(A_C_)  TO(ABC_);
+   machine.set_transition<10> FROM(AB__)  TO(ABC_);
+   machine.set_transition<11> FROM(_BC_)  TO(ABC_);
+   machine.set_transition<12> FROM(A_C_)  TO(ABC_);
    
-   machine.set_transition<12> FROM(ABC_)  TO(A_C_2);
+   machine.set_transition<13> FROM(ABC_)  TO(A_C_2);
    
-   machine.set_transition<13> FROM(A_C_2) TO(ABC_2);
+   machine.set_transition<14> FROM(A_C_2) TO(ABC_2);
    
-   machine.set_transition<14> FROM(ABC_2) TO(ABCD);
+   machine.set_transition<15> FROM(ABC_2) TO(ABCD);
 }
 
 #ifndef TEST
@@ -301,7 +316,7 @@ void loop() {
    lamp_5.set(outputs.get< 4 >());
    output.set(outputs.get< 5 >());
    
-   Serial.println(String("in: ") + finite::to_string(inputs, 'A')+" out: "+finite::to_string(inputs, '1')+" "+machine.state());
+   Serial.println(String("in: ") + inputs.to_string('A')+" out: "+inputs.to_string('1')+" "+machine.state_name());
 }
 
 #endif // TEST

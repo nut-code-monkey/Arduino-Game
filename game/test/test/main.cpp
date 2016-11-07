@@ -8,6 +8,12 @@
 
 #include <iostream>
 
+#define BOOST_TEST_MAIN 1
+#define BOOST_TEST_DYN_LINK
+
+#define BOOST_TEST_MODULE Test
+#include <boost/test/unit_test.hpp>
+
 #define TEST 1
 
 #define bitRead(value, bit) (((value) >> (bit)) & 0x01)
@@ -19,6 +25,8 @@
 
 #include <cassert>
 
+using namespace states;
+
 states::lamp next(std::initializer_list<int> bin){
    
    states::card inputs(0);
@@ -26,23 +34,106 @@ states::lamp next(std::initializer_list<int> bin){
       inputs.set(i, *(bin.begin()+i));
    }
    auto outputs = machine.next_state(&inputs);
-   std::cout << "in: " << finite::to_string(inputs, 'A') << " out: " << finite::to_string(outputs, '1')<< " " << machine.state() << std::endl;
+   std::cout << "in: " << inputs.to_string('A') << " out: " << outputs.to_string('1')<< " " << machine.state_name() << std::endl;
    return outputs;
 }
 
-int main(int argc, const char * argv[]) {
-   
+
+BOOST_AUTO_TEST_CASE(ABC){
    setup_state_machine();
-   
-   assert(next({0,0,0,0}) == states:: ____  .value);
-   assert(next({0,1,0,0}) == states:: _B__  .value);
-   assert(next({1,1,0,0}) == states:: AB__  .value);
-   assert(next({0,1,0,0}) == states:: AB__  .value);
-   assert(next({0,0,0,0}) == states:: AB__  .value);
-   assert(next({1,1,1,0}) == states:: ABC_  .value);
-   assert(next({1,0,1,0}) == states:: A_C_2 .value);
-   assert(next({1,1,1,0}) == states:: ABC_2 .value);
-   assert(next({1,1,1,1}) == states:: ABCD  .value);
-   
-   return 0;
+   machine.reset();
+
+   BOOST_CHECK(next({0,0,0,0}) ==  ____ .value);
+   BOOST_CHECK(next({1,0,0,0}) ==  A___ .value);
+   BOOST_CHECK(next({1,1,0,0}) ==  AB__ .value);
+   BOOST_CHECK(next({1,1,1,0}) ==  ABC_ .value);
+   BOOST_CHECK(next({1,0,1,0}) ==  A_C_2.value);
+   BOOST_CHECK(next({1,1,1,0}) ==  ABC_2.value);
+   BOOST_CHECK(next({1,1,1,1}) ==  ABCD .value);
 }
+
+BOOST_AUTO_TEST_CASE(ACB){
+   setup_state_machine();
+   machine.reset();
+   
+   BOOST_CHECK(next({0,0,0,0}) ==  ____ .value);
+   BOOST_CHECK(next({1,0,0,0}) ==  A___ .value);
+   BOOST_CHECK(next({1,0,1,0}) ==  A_C_ .value);
+   BOOST_CHECK(next({1,1,1,0}) ==  ABC_ .value);
+   BOOST_CHECK(next({1,0,1,0}) ==  A_C_2.value);
+   BOOST_CHECK(next({1,1,1,0}) ==  ABC_2.value);
+   BOOST_CHECK(next({1,1,1,1}) ==  ABCD .value);
+}
+
+BOOST_AUTO_TEST_CASE (BAC) {
+   setup_state_machine();
+   machine.reset();
+   
+   BOOST_CHECK(next({0,0,0,0}) == ____  .value);
+   BOOST_CHECK(next({0,1,0,0}) == _B__  .value);
+   BOOST_CHECK(next({1,1,0,0}) == AB__  .value);
+   BOOST_CHECK(next({1,1,1,0}) == ABC_  .value);
+   BOOST_CHECK(next({1,0,1,0}) == A_C_2 .value);
+   BOOST_CHECK(next({1,1,1,0}) == ABC_2 .value);
+   BOOST_CHECK(next({1,1,1,1}) == ABCD  .value);
+}
+
+BOOST_AUTO_TEST_CASE (BCA) {
+   setup_state_machine();
+   machine.reset();
+   
+   BOOST_CHECK(next({0,0,0,0}) == ____  .value);
+   BOOST_CHECK(next({0,1,0,0}) == _B__  .value);
+   BOOST_CHECK(next({0,1,1,0}) == _BC_  .value);
+   BOOST_CHECK(next({1,1,1,0}) == ABC_  .value);
+   BOOST_CHECK(next({1,0,1,0}) == A_C_2 .value);
+   BOOST_CHECK(next({1,1,1,0}) == ABC_2 .value);
+   BOOST_CHECK(next({1,1,1,1}) == ABCD  .value);
+}
+
+
+BOOST_AUTO_TEST_CASE (CAB) {
+   setup_state_machine();
+   machine.reset();
+   
+   BOOST_CHECK(next({0,0,0,0}) == ____  .value);
+   BOOST_CHECK(next({0,0,1,0}) == __C_  .value);
+   BOOST_CHECK(next({1,0,1,0}) == A_C_  .value);
+   BOOST_CHECK(next({1,1,1,0}) == ABC_  .value);
+   BOOST_CHECK(next({1,0,1,0}) == A_C_2 .value);
+   BOOST_CHECK(next({1,1,1,0}) == ABC_2 .value);
+   BOOST_CHECK(next({1,1,1,1}) == ABCD  .value);
+}
+
+BOOST_AUTO_TEST_CASE (CBA) {
+   setup_state_machine();
+   machine.reset();
+   
+   BOOST_CHECK(next({0,0,0,0}) == ____  .value);
+   BOOST_CHECK(next({0,0,1,0}) == __C_  .value);
+   BOOST_CHECK(next({0,1,1,0}) == _BC_  .value);
+   BOOST_CHECK(next({1,1,1,0}) == ABC_  .value);
+   BOOST_CHECK(next({1,0,1,0}) == A_C_2 .value);
+   BOOST_CHECK(next({1,1,1,0}) == ABC_2 .value);
+   BOOST_CHECK(next({1,1,1,1}) == ABCD  .value);
+}
+
+
+BOOST_AUTO_TEST_CASE(wrong_ABC){
+   setup_state_machine();
+   machine.reset();
+   
+   BOOST_CHECK(next({0,0,0,0}) ==  ____ .value);
+   BOOST_CHECK(next({1,0,0,0}) ==  A___ .value);
+   BOOST_CHECK(next({0,0,0,0}) ==  A___ .value);
+   BOOST_CHECK(next({1,1,0,0}) ==  AB__ .value);
+   BOOST_CHECK(next({0,0,0,0}) ==  AB__ .value);
+   BOOST_CHECK(next({1,1,1,0}) ==  ABC_ .value);
+   BOOST_CHECK(next({0,0,0,0}) ==  ABC_ .value);
+   BOOST_CHECK(next({1,0,1,0}) ==  A_C_2.value);
+   BOOST_CHECK(next({0,0,0,0}) ==  A_C_2.value);
+   BOOST_CHECK(next({1,1,1,0}) ==  ABC_2.value);
+   BOOST_CHECK(next({0,0,0,0}) ==  ABC_2.value);
+   BOOST_CHECK(next({1,1,1,1}) ==  ABCD .value);
+}
+

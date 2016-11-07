@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2132384D1DD0F44C00A51829 /* libboost_unit_test_framework.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 2132384C1DD0F44C00A51829 /* libboost_unit_test_framework.dylib */; };
 		21E225E91DCBE98000CF6424 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 21E225E81DCBE98000CF6424 /* main.cpp */; };
 /* End PBXBuildFile section */
 
@@ -23,6 +24,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		2132384C1DD0F44C00A51829 /* libboost_unit_test_framework.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libboost_unit_test_framework.dylib; path = ../../../../../../../usr/local/Cellar/boost/1.62.0/lib/libboost_unit_test_framework.dylib; sourceTree = "<group>"; };
 		21E225E51DCBE98000CF6424 /* test */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = test; sourceTree = BUILT_PRODUCTS_DIR; };
 		21E225E81DCBE98000CF6424 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -32,17 +34,27 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2132384D1DD0F44C00A51829 /* libboost_unit_test_framework.dylib in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		2132384B1DD0F44C00A51829 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				2132384C1DD0F44C00A51829 /* libboost_unit_test_framework.dylib */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		21E225DC1DCBE98000CF6424 = {
 			isa = PBXGroup;
 			children = (
 				21E225E71DCBE98000CF6424 /* test */,
 				21E225E61DCBE98000CF6424 /* Products */,
+				2132384B1DD0F44C00A51829 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -216,6 +228,11 @@
 		21E225ED1DCBE98000CF6424 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				HEADER_SEARCH_PATHS = /usr/local/include;
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					/usr/local/Cellar/boost/1.62.0/lib,
+				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -223,6 +240,11 @@
 		21E225EE1DCBE98000CF6424 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				HEADER_SEARCH_PATHS = /usr/local/include;
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					/usr/local/Cellar/boost/1.62.0/lib,
+				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
@@ -246,6 +268,7 @@
 				21E225EE1DCBE98000CF6424 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
