@@ -183,9 +183,7 @@ namespace finite {
 #ifndef TEST
 
 bool is_valid(MFRC522::StatusCode code, const char* function, const char* reader){
-   
 #ifdef DEBUG
-   
 #define STRING(s) #s
 #define PRINT_STATUS(status) case status : Serial.println(String(reader)+" "+function+" : "+ STRING(status) ); break
    
@@ -217,16 +215,16 @@ bool is_valid(MFRC522::StatusCode code, const char* function, const char* reader
  */
 bool is_module_find_card_with_id(MFRC522& module, const char* name, const String& uuid) {
    
+   if (!is_valid(module.PICC_HaltA(), "PICC_HaltA", name)) {
+      return false;
+   }
+   
    byte atqa_answer[2];
    byte atqa_size = 2;
    if (!is_valid(module.PICC_WakeupA(atqa_answer, &atqa_size), "PICC_WakeupA", name)) {
       return false;
    }
-   
-   if (!is_valid(module.PICC_RequestA(atqa_answer, &atqa_size), "PICC_RequestA", name)) {
-      return false;
-   }
-   
+
    MFRC522::Uid uid;
    if (!is_valid(module.PICC_Select(&uid), "PICC_Select", name)) {
       return false;
