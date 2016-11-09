@@ -33,6 +33,8 @@
 #include <MFRC522.h>
 #include <Firmata.h>
 
+#define DEBUG 1
+
 namespace pin {
    
    template <size_t Pin> struct out {
@@ -179,27 +181,63 @@ namespace finite {
 }
 
 #ifndef TEST
+
+bool is_valid(MFRC522::StatusCode code, const char* function, const char* reader){
+   
+#ifdef DEBUG
+   
+#define STRING(s) #s
+#define PRINT_STATUS(status) case status : Serial.println(String(reader)+" "+function+" : "+ STRING(status) ); break
+   
+   switch (code) {
+      case MFRC522::STATUS_OK:{
+         return true;
+      }
+         PRINT_STATUS(MFRC522::STATUS_ERROR);
+         PRINT_STATUS(MFRC522::STATUS_COLLISION); // Collission detected
+         PRINT_STATUS(MFRC522::STATUS_TIMEOUT); // Timeout in communication.
+         PRINT_STATUS(MFRC522::STATUS_NO_ROOM); // A buffer is not big enough.
+         PRINT_STATUS(MFRC522::STATUS_INTERNAL_ERROR); // Internal error in the code. Should not happen ;-)
+         PRINT_STATUS(MFRC522::STATUS_INVALID);// Invalid argument.
+         PRINT_STATUS(MFRC522::STATUS_CRC_WRONG); // The CRC_A does not match
+         PRINT_STATUS(MFRC522::STATUS_MIFARE_NACK); // A MIFARE PICC responded with NAK.
+      default:
+         Serial.println(String(reader)+" "+function+" : unknown responce");
+   }
+   return false;
+   
+#else
+   return code == MFRC522::STATUS_OK;
+#endif
+}
+
 /*
  * @brief : read MFRC522 each time function caled.
  * @return : string with TAG id
  */
-bool is_module_find_card_with_id(MFRC522& module, const String& uuid) {
+bool is_module_find_card_with_id(MFRC522& module, const char* name, const String& uuid) {
+   
    byte atqa_answer[2];
    byte atqa_size = 2;
-   if (MFRC522::STATUS_OK != module.PICC_WakeupA(atqa_answer, &atqa_size)) {
+   if (!is_valid(module.PICC_WakeupA(atqa_answer, &atqa_size), "PICC_WakeupA", name)) {
       return false;
    }
    
-   if (!module.PICC_ReadCardSerial()) {
+   if (!is_valid(module.PICC_RequestA(atqa_answer, &atqa_size), "PICC_RequestA", name)) {
+      return false;
+   }
+   
+   MFRC522::Uid uid;
+   if (!is_valid(module.PICC_Select(&uid), "PICC_Select", name)) {
       return false;
    }
    
    static String content("");
    content.reserve(32);
    content = "";
-   for (size_t i = 0; i < module.uid.size; ++i) {
-      content.concat(String(module.uid.uidByte[i] < 0x10 ? "0" : ""));
-      content.concat(String(module.uid.uidByte[i], HEX));
+   for (size_t i = 0; i < uid.size; ++i) {
+      content.concat(String(uid.uidByte[i] < 0x10 ? "0" : ""));
+      content.concat(String(uid.uidByte[i], HEX));
    }
    content.toLowerCase();
    return content.equals(uuid);
@@ -301,11 +339,13 @@ void setup() {
 
 void loop() {
    static states::card inputs(0);
+
+#define READER(N) reader_##N.module, #N
    
-   inputs.set< 0 >(is_module_find_card_with_id(reader_A.module, String("56bbd45c")));
-   inputs.set< 1 >(is_module_find_card_with_id(reader_B.module, String("b508d965")));
-   inputs.set< 2 >(is_module_find_card_with_id(reader_C.module, String("062c565e")));
-   inputs.set< 3 >(is_module_find_card_with_id(reader_D.module, String("1537d265")));
+   inputs.set< 0 >(is_module_find_card_with_id(READER(A), String("56bbd45c")));
+   inputs.set< 1 >(is_module_find_card_with_id(READER(B), String("b508d965")));
+   inputs.set< 2 >(is_module_find_card_with_id(READER(C), String("062c565e")));
+   inputs.set< 3 >(is_module_find_card_with_id(READER(D), String("1537d265")));
    
    auto outputs = machine.next_state(&inputs);
    
@@ -316,7 +356,9 @@ void loop() {
    lamp_5.set(outputs.get< 4 >());
    output.set(outputs.get< 5 >());
    
-   Serial.println(String("in: ") + inputs.to_string('A')+" out: "+inputs.to_string('1')+" "+machine.state_name());
+#ifdef DEBUG
+   Serial.println(String("in: ") + inputs.to_string('A')+" out: "+outputs.to_string('1')+" "+machine.state_name());
+#endif
 }
 
 #endif // TEST
