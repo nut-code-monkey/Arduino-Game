@@ -33,7 +33,7 @@
 #include <MFRC522.h>
 #include <Firmata.h>
 
-#define DEBUG 1
+//#define DEBUG 1
 
 namespace pin {
    
@@ -117,10 +117,12 @@ namespace finite {
       
       constexpr T bits() const {
          return _bits;
-      };
+      }
+      
       constexpr static size_t size(){
          return Size;
       }
+      
       constexpr bool operator == (const state& s) const {
          return _bits == s._bits;
       }
@@ -137,25 +139,34 @@ namespace finite {
       
       Value values[N];
       Value current_value;
-      
+#ifdef DEBUG
       const char * names[N];
       const char* current_name;
+#endif
    public:
       
       void reset() {
          current_state = from_states[0];
          current_value = values[0];
+#ifdef DEBUG
          current_name = names[0];
       }
       
       const char* state_name() const {
          return current_name;
-      };
+#endif
+      }
       
-      state_machine(State s, Value v) : current_state(s), current_value(v), current_name("initial") {
+      state_machine(State s, Value v) : current_state(s), current_value(v)
+#ifdef DEBUG
+      , current_name("initial")
+#endif
+      {
          from_states[0] = current_state;
          to_states[0] = current_state;
+#ifdef DEBUG
          names[0] = current_name;
+#endif
       }
    
       template<size_t X>
@@ -163,7 +174,9 @@ namespace finite {
          from_states[X] = from;
          to_states[X] = to;
          values[X] = value;
+#ifdef DEBUG
          names[X] = name;
+#endif
       }
       
       const Value& next_state(const State state) {
@@ -171,7 +184,9 @@ namespace finite {
             if (from_states[i] == current_state && to_states[i]->bits() == state->bits()){
                current_state = to_states[i];
                current_value = values[i];
+#ifdef DEBUG
                current_name = names[i];
+#endif
                return current_value;
             }
          }
@@ -294,7 +309,12 @@ finite::state_machine<states::card*, states::lamp, 16> machine(&states::____.sta
 void setup_state_machine(){
    using namespace states;
 #define FROM(node) (&node.state,
+   
+#ifdef DEBUG
 #define TO(node) &node.state, node.value, #node)
+#else
+#define TO(node) &node.state, node.value, NULL)
+#endif
    
    machine.set_transition<1>  FROM(____)  TO(A___);
    machine.set_transition<2>  FROM(____)  TO(_B__);
@@ -338,7 +358,11 @@ void setup() {
 void loop() {
    static states::card inputs(0);
 
+#ifdef DEBUG
 #define READER(N) reader_##N.module, #N
+#else
+#define READER(N) reader_##N.module, NULL   
+#endif
    
    inputs.set< 0 >(is_module_find_card_with_id(READER(A), String("56bbd45c")));
    inputs.set< 1 >(is_module_find_card_with_id(READER(B), String("b508d965")));
