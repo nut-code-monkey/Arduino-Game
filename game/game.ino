@@ -226,9 +226,9 @@ bool is_valid(MFRC522::StatusCode code, const char* function, const char* reader
 
 /*
  * @brief : read MFRC522 each time function caled.
- * @return : string with TAG id
+ * @return : is module find card with id
  */
-bool is_module_find_card_with_id(MFRC522& module, const char* name, const String& uuid) {
+bool is_module_find_card_with_id(MFRC522& module, const char* name, const char* uuid) {
    
    if (!is_valid(module.PICC_HaltA(), "PICC_HaltA", name)) {
       return false;
@@ -364,12 +364,12 @@ void loop() {
 #define READER(N) reader_##N.module, NULL   
 #endif
    
-   inputs.set< 0 >(is_module_find_card_with_id(READER(A), String("56bbd45c")));
-   inputs.set< 1 >(is_module_find_card_with_id(READER(B), String("b508d965")));
-   inputs.set< 2 >(is_module_find_card_with_id(READER(C), String("062c565e")));
-   inputs.set< 3 >(is_module_find_card_with_id(READER(D), String("1537d265")));
+   inputs.set< 0 >(is_module_find_card_with_id(READER(A), "56bbd45c"));
+   inputs.set< 1 >(is_module_find_card_with_id(READER(B), "b508d965"));
+   inputs.set< 2 >(is_module_find_card_with_id(READER(C), "062c565e"));
+   inputs.set< 3 >(is_module_find_card_with_id(READER(D), "1537d265"));
    
-   auto outputs = machine.next_state(&inputs);
+   const auto outputs = machine.next_state(&inputs);
    
    lamp_1.set(outputs.get< 0 >());
    lamp_2.set(outputs.get< 1 >());
